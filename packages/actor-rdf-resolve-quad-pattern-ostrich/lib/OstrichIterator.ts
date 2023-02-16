@@ -2,6 +2,7 @@ import type { VersionContext } from '@comunica/types-versioning';
 import type { BufferedIteratorOptions } from 'asynciterator';
 import { BufferedIterator } from 'asynciterator';
 import type { OstrichStore } from 'ostrich-bindings';
+import { DataFactory } from 'rdf-data-factory';
 import type * as RDF from 'rdf-js';
 
 export class OstrichIterator extends BufferedIterator<RDF.Quad> {
@@ -10,6 +11,8 @@ export class OstrichIterator extends BufferedIterator<RDF.Quad> {
   protected readonly subject?: RDF.Term;
   protected readonly predicate?: RDF.Term;
   protected readonly object?: RDF.Term;
+
+  protected readonly factory: RDF.DataFactory;
 
   protected reading: boolean;
 
@@ -27,6 +30,8 @@ export class OstrichIterator extends BufferedIterator<RDF.Quad> {
     this.subject = subject;
     this.predicate = predicate;
     this.object = object;
+
+    this.factory = new DataFactory();
 
     this.reading = false;
   }
@@ -78,7 +83,17 @@ export class OstrichIterator extends BufferedIterator<RDF.Quad> {
       case 'version-query':
         this.store.searchTriplesVersion(this.subject, this.predicate, this.object)
           .then(({ triples }) => {
-            triples.forEach(t => this._push(t));
+            triples.forEach(t => {
+              t.versions.forEach(version => {
+                const quad: RDF.Quad = this.factory.quad(
+                  t.subject,
+                  t.predicate,
+                  t.object,
+                  this.factory.namedNode(`version:${version}`),
+                );
+                this._push(quad);
+              });
+            });
             this.reading = false;
             this.close();
             done();

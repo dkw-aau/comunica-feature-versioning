@@ -55,7 +55,7 @@ export class ActorQueryOperationContextifyVersion extends ActorQueryOperation
     if (baseGraphUri && graph.startsWith(baseGraphUri)) {
       graph = graph.slice(baseGraphUri.length);
     }
-    if (numericalVersions && graph !== '?') {
+    if (numericalVersions) {
       return Number.parseInt(graph, 10);
     }
     return graph;
@@ -79,7 +79,8 @@ export class ActorQueryOperationContextifyVersion extends ActorQueryOperation
     let operation: Algebra.Operation | undefined;
     const versionContext: any = {};
     let valid = false;
-    if (action.operation.type === 'pattern' && action.operation.graph.termType !== 'DefaultGraph') {
+    if ((action.operation.type === 'pattern' && action.operation.graph.termType !== 'DefaultGraph') ||
+        action.operation.graph.termType === 'Variable') {
       valid = true;
 
       // Create operation
@@ -89,13 +90,13 @@ export class ActorQueryOperationContextifyVersion extends ActorQueryOperation
         action.operation.object,
       );
 
-      // Create version context
-      const version = this.graphToStringOrNumber(action.operation.graph.value);
-      if (version === '?') {
+      if (action.operation.graph.termType === 'Variable') {
         // Version query
         versionContext.type = 'version-query';
       } else {
         // Version materialization
+        // Create version context
+        const version = this.graphToStringOrNumber(action.operation.graph.value);
         versionContext.type = 'version-materialization';
         versionContext.version = version;
       }
