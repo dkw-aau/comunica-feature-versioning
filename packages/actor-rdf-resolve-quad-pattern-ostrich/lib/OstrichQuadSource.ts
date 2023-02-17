@@ -15,8 +15,8 @@ export class OstrichQuadSource implements IQuadSource {
   }
 
   public match(subject: RDF.Term, predicate: RDF.Term, object: RDF.Term, graph: RDF.Term): AsyncIterator<RDF.Quad> {
-    if (graph && graph.termType !== 'DefaultGraph') {
-      throw new Error('OstrichQuadSource only supports triple pattern queries within the default graph.');
+    if (graph && graph.termType !== 'DefaultGraph' && graph.termType !== 'Variable') {
+      throw new Error('OstrichQuadSource only supports triple pattern queries within the default graph or variable.');
     }
     const it = new OstrichIterator(this.store,
       this.versionContext,

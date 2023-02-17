@@ -65,8 +65,8 @@ export class ActorRdfResolveQuadPatternOstrich extends ActorRdfResolveQuadPatter
     if (!hasContextSingleSourceOfType('ostrichFile', action.context)) {
       throw new Error(`${this.name} requires a single source with a ostrichFile to be present in the context.`);
     }
-    if (action.pattern.graph.termType !== 'DefaultGraph') {
-      throw new Error(`${this.name} can only perform versioned queries in the default graph.`);
+    if (action.pattern.graph.termType !== 'DefaultGraph' && action.pattern.graph.termType !== 'Variable') {
+      throw new Error(`${this.name} can only perform versioned queries in the default graph or variable.`);
     }
     if (action.context.has(KeysRdfResolveQuadPattern.version) &&
       (action.context.getSafe<VersionContext>(KeysRdfResolveQuadPattern.version).type !== 'version-materialization' &&

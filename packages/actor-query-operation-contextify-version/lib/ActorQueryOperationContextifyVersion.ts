@@ -79,8 +79,13 @@ export class ActorQueryOperationContextifyVersion extends ActorQueryOperation
     let operation: Algebra.Operation | undefined;
     const versionContext: any = {};
     let valid = false;
-    if ((action.operation.type === 'pattern' && action.operation.graph.termType !== 'DefaultGraph') ||
-        action.operation.graph.termType === 'Variable') {
+    if (action.operation.type === 'pattern' && action.operation.graph.termType === 'Variable') {
+      // Version query
+      valid = true;
+      operation = action.operation;
+      versionContext.type = 'version-query';
+    } else if (action.operation.type === 'pattern' && action.operation.graph.termType !== 'DefaultGraph') {
+      // Version materialization
       valid = true;
 
       // Create operation
@@ -90,16 +95,10 @@ export class ActorQueryOperationContextifyVersion extends ActorQueryOperation
         action.operation.object,
       );
 
-      if (action.operation.graph.termType === 'Variable') {
-        // Version query
-        versionContext.type = 'version-query';
-      } else {
-        // Version materialization
-        // Create version context
-        const version = this.graphToStringOrNumber(action.operation.graph.value);
-        versionContext.type = 'version-materialization';
-        versionContext.version = version;
-      }
+      // Create version context
+      const version = this.graphToStringOrNumber(action.operation.graph.value);
+      versionContext.type = 'version-materialization';
+      versionContext.version = version;
     } else if (action.operation.type === 'filter' &&
       action.operation.expression.expressionType === 'existence' &&
       action.operation.expression.not) {
