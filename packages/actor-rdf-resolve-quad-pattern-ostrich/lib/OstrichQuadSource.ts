@@ -46,8 +46,8 @@ export class OstrichQuadSource implements IQuadSource {
         return this.store.countTriplesDeltaMaterialized(subject,
           predicate,
           object,
-          this.versionContext.versionEnd,
-          this.versionContext.versionStart);
+          this.versionContext.versionStart,
+          this.versionContext.versionEnd);
       case 'version-query':
         return this.store.countTriplesVersion(subject, predicate, object);
     }
