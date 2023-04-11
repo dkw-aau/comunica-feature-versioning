@@ -2,7 +2,7 @@ import type { VersionContext } from '@comunica/types-versioning';
 import type { BufferedIteratorOptions } from 'asynciterator';
 import { BufferedIterator } from 'asynciterator';
 import { BufferedOstrichStore } from 'ostrich-bindings';
-import type { OstrichStore } from 'ostrich-bindings';
+import type { OstrichStore, QueryIterator, IQuadDelta, IQuadVersion } from 'ostrich-bindings';
 import { DataFactory } from 'rdf-data-factory';
 import type * as RDF from 'rdf-js';
 
@@ -107,7 +107,7 @@ export class OstrichIterator extends BufferedIterator<RDF.Quad> {
 
 export class BufferedOstrichIterator extends BufferedIterator<RDF.Quad> {
   protected readonly store: BufferedOstrichStore;
-  protected queryIterator: IterableIterator<RDF.Quad>;
+  protected queryIterator: QueryIterator;
   protected readonly versionContext: VersionContext;
   protected readonly subject?: RDF.Term;
   protected readonly predicate?: RDF.Term;
@@ -158,50 +158,70 @@ export class BufferedOstrichIterator extends BufferedIterator<RDF.Quad> {
   }
 
   public _read(count: number, done: () => void): void {
+    if (this.store.closed) {
+      this.close();
+      return done();
+    }
     if (this.reading) {
       return done();
     }
     this.reading = true;
-    let processed = 0;
     if (typeof this.queryIterator === 'undefined') {
       this.initializeIterator();
     }
-    for (const quad of this.queryIterator) {
-      switch (this.versionContext.type) {
-        case 'delta-materialization':
-          // @ts-expect-error When running DM queries, quad will have an "addition" property
-          if (quad.addition === this.versionContext.queryAdditions) {
-            this._push(quad);
-            processed++;
-          }
-          break;
-        case 'version-query':
-          // @ts-expect-error When running V queries, quad will have a "versions" property
-          for (const version of quad.versions) {
-            const quadV: RDF.Quad = this.factory.quad(
-              quad.subject,
-              quad.predicate,
-              quad.object,
-              this.factory.namedNode(`version:${version}`),
-            );
-            this._push(quadV);
-            processed++;
-          }
-          break;
-        case 'version-materialization':
-          this._push(quad);
-          processed++;
-          break;
-      }
-      if (processed === count) {
+    switch (this.versionContext.type) {
+      case 'version-materialization':
+        this.queryIterator.next()
+          .then(quads => {
+            quads[1].forEach(quad => this._push(quad));
+            this.reading = false;
+            // Done: no more triples to come after this buffer
+            if (quads[0]) {
+              this.close();
+            }
+            done();
+          })
+          .catch(error => this.destroy(error));
         break;
-      }
-    }
-    done();
-    this.reading = false;
-    // If the number of processed quads is inferior to 'count', then the iterator is 'done'
-    if (processed < count) {
-      this.close();
+      case 'delta-materialization':
+        // eslint-disable-next-line no-case-declarations
+        const queryAdditions = this.versionContext.queryAdditions;
+        this.queryIterator.next()
+          .then(quads => {
+            quads[1] = quads[1].filter(t => (<IQuadDelta> t).addition === queryAdditions);
+            quads[1].forEach(t => this._push(t));
+            this.reading = false;
+            // Done: no more triples to come after this buffer
+            if (quads[0]) {
+              this.close();
+            }
+            done();
+          })
+          .catch(error => this.destroy(error));
+        break;
+      case 'version-query':
+        this.queryIterator.next()
+          .then(quads => {
+            quads[1].forEach(quad => {
+              (<IQuadVersion> quad).versions.forEach(version => {
+                const newQuad = this.factory.quad(
+                  quad.subject,
+                  quad.predicate,
+                  quad.object,
+                  this.factory.namedNode(`version:${version}`),
+                );
+                this._push(quad);
+              });
+            });
+            this.reading = false;
+            // Done: no more triples to come after this buffer
+            if (quads[0]) {
+              this.close();
+            }
+            done();
+          })
+          .catch(error => this.destroy(error));
+        break;
     }
   }
 }
