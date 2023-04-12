@@ -210,7 +210,7 @@ export class BufferedOstrichIterator extends BufferedIterator<RDF.Quad> {
                   quad.object,
                   this.factory.namedNode(`version:${version}`),
                 );
-                this._push(quad);
+                this._push(newQuad);
               });
             });
             this.reading = false;
